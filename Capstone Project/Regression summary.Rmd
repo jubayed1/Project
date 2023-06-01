@@ -1,0 +1,106 @@
+---
+title: "Regression summaries"
+author: "Abdullah Al Jubayed"
+date: "2023-04-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/abdullahaljubayed/Desktop/Capstone Project")
+```
+
+```{r}
+library(dplyr)
+library(readxl)
+library(geosphere)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(sandwich)
+library(lmtest)
+library(estimatr)
+library(readr)
+library(AER)
+library(stargazer)
+```
+
+```{r}
+final_data<- read_excel("final_data.xlsx") ##within 1 mile radius
+final<- read_excel('final.xlsx') ##within 0.1 mile radius
+
+```
+
+
+```{r}
+#################within 1mile radius
+
+ln_soldprice<- log(final_data$soldprice)
+reg1<-lm(ln_soldprice~offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+           age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+           sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+           sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+tract_212270102+tract_212270103+tract_212270104+tract_212270105+tract_212270106+tract_212270107+tract_212270108+tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = final_data)
+
+reg2<- lm(daysonmarket~offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+            age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+            sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+            sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+tract_212270102+tract_212270103+tract_212270104+tract_212270105+tract_212270106+tract_212270107+tract_212270108+tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+
+            tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = final_data)
+
+```
+
+
+```{r}
+# This summary includes within 1 mile radius of houses
+stargazer(reg1,reg2, type = 'text')
+
+```
+I check for the robustness but the standard errors do not change that much for instance: offenders_near_house SE is 0.0011 when I go for robust SE it is 0.0013.
+```{r}
+reg_robust1<-lm_robust(ln_soldprice~age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+           age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+           sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+           sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+offenders_near_house+year_sold+month_sold+tract_212270102+tract_212270103+tract_212270104+tract_212270105+tract_212270106+tract_212270107+tract_212270108+tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = final_data)
+summary(reg_robust1)
+```
+
+```{r}
+############### Without Tract dummies
+reg11<- lm(ln_soldprice~offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+           age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+           sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+           sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use, data = final_data)
+ reg22<- lm(daysonmarket~offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+            age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+            sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+            sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use, data = final_data)
+ 
+ stargazer(reg11, reg22, type = 'text')
+
+```
+
+
+
+```{r}
+##################within 0.1 mile radius
+ln_soldprice2<-log(final$soldprice)
+reg3<-lm(ln_soldprice2~n_offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+           age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+           sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+           sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use, data = final)
+
+reg4<- lm(daysonmarket~n_offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+            age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+            sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+            sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use, data = final)
+```
+
+
+```{r}
+#This regression summary with 0.1mile radius from houses
+
+stargazer(reg3,reg4, type = 'text')
+```
+
+The radius(0.1 mile) is very small when I include the tract dummies it drops the n_offenders_near_house variable and include the previous 1 mile (offender_near_house) variable
+there are only 800 offenders within 0.1 mile from houses among them only 126 offenders lived those houses before sold

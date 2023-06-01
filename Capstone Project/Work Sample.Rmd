@@ -1,0 +1,497 @@
+---
+title: "Work Sample"
+author: "Abdullah Al Jubayed"
+date: "2023-05-23"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/abdullahaljubayed/Desktop/Capstone Project")
+```
+
+
+```{r}
+library(readxl)
+library(tidygeocoder)
+library(tidyverse)
+library(dplyr)
+library(geosphere)
+#install.packages('geosphere')
+ #housedata <- read_excel("warren.xlsx")
+
+setwd("/Users/abdullahaljubayed/Desktop/Capstone Project")
+offenders<- read_excel('geocoded_offender.xlsx')
+
+haversine <- function(lat1, lon1, lat2, lon2) {
+  dlat <- lat2 - lat1
+  dlon <- lon2 - lon1
+  a <- (sin(dlat/2))^2 + cos(lat1) * cos(lat2) * (sin(dlon/2))^2
+  c <- 2 * asin(min(1, sqrt(a)))
+  R <- 3961 # radius of earth in miles
+  d <- R * c
+  return(d)
+}
+
+
+houses_data <- read_excel("warren.xlsx")
+
+houses <- houses_data[, c("latitude", "longitude")]
+
+
+sex_offenders <- offenders[, c("lat", 'long')]
+  
+
+# Find all sex offenders within 1 mile of the house
+result <- data.frame(house_index = numeric(), sex_offender_index = numeric(), distance = numeric())
+for (i in 1:nrow(houses)) {
+  distances <- sapply(1:nrow(sex_offenders), function(j) {
+    haversine(houses$latitude[i], houses$longitude[i], sex_offenders$lat[j], sex_offenders$long[j])
+  })
+  within_1_mile <- which(distances <= 1)
+  temp_result <- data.frame(
+    house_index = rep(i, length(within_1_mile)),
+    sex_offender_index = within_1_mile,
+    distance = distances[within_1_mile]
+  )
+  result <- rbind(result, temp_result)
+}
+
+print(result)
+
+nearest_offender <- data.frame(house_id = numeric(),
+                               offender_id = numeric(),
+                               distance = numeric())
+for (i in 1:nrow(houses)) {
+  
+  distances <- distHaversine(offenders[,c("long","lat")], houses[i,c("longitude","latitude")])
+
+  nearest <- which.min(distances)
+  nearest_offender <- rbind(nearest_offender, 
+                            data.frame(house_id = houses[i, "house_index"],
+                                       offender_id = offenders[nearest, "house_index"],
+                                       distance = distances[nearest]))
+}
+
+
+
+
+offenders$distance <- distHaversine(offenders[,c("long","lat")], c(long,lat))
+
+
+
+# view (houses_data[2653 ,])
+# offenders[82,4]
+# 
+#  offenders[27,4]
+# view(houses_data[6980,])
+# 
+# offenders[82,4]
+# view( houses_data[9770 ,])
+# 
+# # offenders[ 82,4]
+# view(houses_data[12250    ,])
+# 
+# # offenders[27,4]
+# view(houses_data[12374   ,])
+# 
+# offenders[16 ,4]
+# houses_data[16786 ,1]
+
+```
+
+```{r}
+library(dplyr)
+library(readxl)
+library(geosphere)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(sandwich)
+library(lmtest)
+library(estimatr)
+library(fastDummies)
+library(readr)
+library(AER)
+library(stargazer)
+setwd("/Users/abdullahaljubayed/Desktop/Capstone Project")
+offenders<- read_excel('geocoded_offender.xlsx')
+houses <- read_excel("warren.xlsx")
+d<- read_excel("offenderdata.xlsx", sheet = 2)
+newdf<-read_excel('warren.xlsx')
+ houses <- houses_data[, c( "latitude", "longitude")]
+ 
+offenders <- offender[, c("lat", 'long')]
+
+
+n_offenders_near_house <- numeric(nrow(houses))
+
+for (i in 1:nrow(houses)) {
+  house_lat <- houses$latitude[i]
+  house_lon <- houses$longitude[i]
+  
+  # Calculate the distance between the house and each offender
+  offenders$distance <- distHaversine(cbind(offenders$long, offenders$lat),
+                                      cbind(house_lon, house_lat))
+  
+  # Filter the database to only include offenders within 1 mile of the house
+  offenders_near_house <- offenders %>%
+    filter(distance <= 200.34) # 1 mile = 1609.34 meters
+  
+  # Count the number of offenders within 1 mile of the house
+  n_offenders_near_house[i] <- nrow(offenders_near_house)
+}
+
+# Add the results to the data frame for the houses
+houses$n_offenders_near_house <- n_offenders_near_house
+houses_with_offender<- houses%>%
+  filter(n_offenders_near_house>=1)
+
+# Print the results
+print(houses)
+
+
+#within 1 mile of houses to offenders and the distance
+houses$off_market_date <- as.Date(houses$off_market_date, format = "%m/%d/%Y")
+offenders$Photo.Date <- as.Date(offenders$Photo.Date, format = "%m/%d/%Y")
+haversine_distance <- function(lat1, lon1, lat2, lon2) {
+  R <- 6371 # Earth's radius in kilometers
+  dLat <- (lat2 - lat1) * pi/180
+  dLon <- (lon2 - lon1) * pi/180
+  lat1 <- lat1 * pi/180
+  lat2 <- lat2 * pi/180
+  
+  a <- sin(dLat/2)^2 + cos(lat1) * cos(lat2) * sin(dLon/2)^2
+  c <- 2 * asin(sqrt(a))
+  d <- R * c
+  return(d)
+}
+
+result <- data.frame(house = integer(), offender = integer(), distance = numeric(), photo_date = as.Date(character()), off_market_date = as.Date(character()))
+for (i in 1:nrow(houses)) {
+  for (j in 1:nrow(offenders)) {
+    distance_in_km <- haversine_distance(houses[i, "latitude"], houses[i, "longitude"],
+                                         offenders[j, "lat"], offenders[j, "long"])
+    distance_in_miles <- distance_in_km * 0.621371
+    
+    if (distance_in_miles <= 1) {
+      photo_date <- offenders[j, "Photo.Date"]
+      off_market_date <- houses[i, "off_market_date"]
+      result <- rbind(result, data.frame(house = i, offender = j, distance = distance_in_miles, photo_date = photo_date, off_market_date = off_market_date))
+    }
+  }
+}
+
+
+result$before_sale <- result$Photo.Date < result$off_market_date
+filtered_result <- result[result$before_sale, ]
+
+
+# Merge the filtered result data with the houses data by matching on the row names
+merged_data <- merge(houses, filtered_result, by.x = "row.names", by.y = "house", all = TRUE) %>%
+  group_by(id) %>%
+  mutate(rowforhouse=row_number()) %>%
+  ungroup() %>%
+  filter(rowforhouse==1)
+##
+merged_data3<- cbind(merged_data3, storeies=houses$stories,basement=newdf$basement_d,AC_electric=newdf$electric_AC,attached_garage=newdf$garageattached_d,units=newdf$multiple_units)
+merged_data3$offender_lived_nearby<-houses$offenders_nearby
+##need to add some more variable[stories,basement_d,electric_AC,garageattached_d,multiple_units]
+final_data<- merged_data3 %>%
+  select("askingprice":"lotsize_use",'soldprice','year_sold','month_sold','stories','basement','AC_electric','attached_garage','units','offenders_near_house','tract','daysonmarket',"offender_lived_nearby" )%>%
+  filter(soldprice!='NA')
+combined_data$offender_lived_1<-final_data$offender_lived_nearby
+combi
+combined_data<-cbind(combined_data, stories=final_data$stories,basement=final_data$basement,AC_electric=final_data$AC_electric,attached_garage=final_data$attached_garage,
+                  units=final_data$units)
+prime_data$offender_lived_1<-combined_data$offender_lived_1
+ppp<-combined_data%>%na.omit()
+##
+merged_data<- merged_data%>%
+  filter(lat!='NA', soldprice!="NA")
+merged_data3$distance<-houses$min_distance
+
+merged_data3 <- merge(merged_data, house_sold_price, by = "id")
+merged_data3<- merged_data3[,!names(merged_data3) %in% c("soldprice.x", "Photo.Date", "off_market_date.y", 'offender')]
+merged_data3<-merged_data3%>%
+  rename('soldprice' = 'soldprice.y')
+merged_data$soldprice<- as.numeric(merged_data$soldprice)
+final_data<- merged_data3 %>%
+  select("askingprice":"lotsize_use",'soldprice','year_sold','month_sold','offenders_near_house','tract','daysonmarket',"offender_lived_nearby","distance" )%>%
+  filter(soldprice!='NA')
+
+final_data$soldprice <- gsub("[^0-9.]", "", final_data$soldprice) ##removing all na and non-number
+final_data$soldprice <- na.omit(as.numeric(final_data$soldprice))
+
+
+
+dummy_vars <- dummy_cols(final_data$tract)
+col_names <- colnames(dummy_vars)
+new_col_names <- gsub(".data","tract_", col_names)
+colnames(dummy_vars) <- new_col_names
+final_data <- cbind(final_data, dummy_vars)
+ln_soldprice<- log(final_data$soldprice)
+dum_sold_year<- dummy_cols(final_data$year_sold)
+col_names_y<- colnames(dum_sold_year)
+new_col_names_y<-gsub('.data','year_', col_names_y)
+colnames(dum_sold_year)<- new_col_names_y
+final_data<-cbind(final_data,dum_sold_year)
+
+combined_data<-final_data%>%
+  select("age_05_or_less":"tract__212270119", "year__2012":"year__2021")
+reg1<-lm(ln_soldprice~offenders_near_house+
+           year__2012+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+           year__2020
+         , data = final_data)
+# age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+#   age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+#   sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+#   sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+
+summary(reg1)
+regt<-lm(ln_soldprice~offenders_near_house+year__2012+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+           year__2020, data = final_data)
+####coeftest(reg1,vcov. = vcovHC(reg1, type='HC2'))
+ggplot(final_data,aes(y=soldprice,x=offenders_near_house)) +
+  geom_point()
+###omitted variables(,sqft_1000,tract_212270101) +
+##tract_212270106+tract_212270107+tract_212270108+tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = final_data)
+# regtest <- lm(ln_soldprice ~ offenders_near_house + year_sold + month_sold, data = final_data)
+# options(digits = 15)
+# summary(regtest)
+reg000<- lm(soldprice~offenders_near_house, data = final_data)
+reg2<- lm(daysonmarket~offenders_near_house+year_sold+month_sold+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+            age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+            sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+            sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+ year__2012+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+            year__2020+
+            tract_212270102+tract_212270103+tract_212270104+tract_212270105+tract_212270106+tract_212270107+tract_212270108+tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+
+ 
+                 tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = final_data)
+summary(reg2)
+stargazer(reg1,reg2, type = 'text')
+vif(reg1)
+#the tract dummies have high vif, should we omit the high collinear variable as omitted variables.
+write.csv(final_data, "final_data_1mile.cvs")
+library(writexl)
+write_xlsx(merged_data3, 'merged3.xlsx')
+###################################################################
+merged_data3<-merged_data3
+
+plot(merged_data3$soldprice, merged_data3$offenders_near_house)
+
+
+
+#########
+houses$off_market_date <- as.Date(houses$off_market_date, format = "%m/%d/%Y") 
+offender$Photo.Date <- as.Date(offender$Photo.Date, format = "%m/%d/%Y")
+
+haversine_distance <- function(lat1, lon1, lat2, lon2) {
+  R <- 6371 # Earth's radius in kilometers
+  dLat <- (lat2 - lat1) * pi/180
+  dLon <- (lon2 - lon1) * pi/180
+  lat1 <- lat1 * pi/180
+  lat2 <- lat2 * pi/180
+  
+  a <- sin(dLat/2)^2 + cos(lat1) * cos(lat2) * sin(dLon/2)^2
+  c <- 2 * asin(sqrt(a))
+  d <- R * c
+  return(d)
+}
+
+houses$offenders_nearby <- 0
+
+for (i in 1:nrow(houses)) {
+  house_lat <- houses$latitude[i]
+  house_lon <- houses$longitude[i]
+  offenders_nearby <- 0  
+  
+  for (j in 1:nrow(offenders)) {
+    offender_lat <- offender$lat[j]
+    offender_lon <- offender$long[j]
+    
+    distance_in_km <- haversine_distance(house_lat, house_lon, offender_lat, offender_lon)
+    distance_in_miles <- distance_in_km * 0.621371
+    
+    if (distance_in_miles <= 1 & offender$Photo.Date[j] < houses$off_market_date[i]) {
+      offenders_nearby <- offenders_nearby + 1  
+    }
+  }
+  houses$offenders_nearby[i] <- offenders_nearby
+}
+
+```
+
+```{r}
+library(dplyr)
+library(readxl)
+library(geosphere)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(sandwich)
+library(lmtest)
+library(estimatr)
+library(readr)
+library(AER)
+library(plm)
+library(stargazer)
+library(writexl)
+library(texreg)
+
+setwd("/Users/abdullahaljubayed/Desktop/Capstone Project")
+prime_data<- combined_data%>%
+  select("age_05_or_less":"soldprice","daysonmarket":"year__2021", "offender_lived_1":"basement_dummy")
+colnames(prime_data)[colnames(prime_data) == "offender_lived_nearby"] <- "offenders_lived_0.1"
+prime_data$ln_lotsize<- log(prime_data$lotsize_use)
+prime_data<- prime_data%>%select(-basement)
+##For 1 mile
+regprice1<- lm(ln_soldprice~offender_lived_1, data = prime_data)
+regprice1<-coeftest(regprice1, vcov. = vcovHC(regprice1, type= "HC2"))
+regprice1_fix_house<-lm(ln_soldprice~offender_lived_1+
+   beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                          sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                          sqft_3751_4250+sqft_4251_5000+sqft_5001_5500, data = prime_data)
+regprice1_fix_house<-coeftest(regprice1_fix_house, vcov. = vcovHC(regprice1_fix_house, type= "HC2"))
+
+regprice1_house_time<-lm(ln_soldprice~offender_lived_1+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                           sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                           sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+month_1+month_2+month_3+month_4+month_5+month_6+month_7+month_8+month_9+month_10+month_11+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                       year__2020+year__2021, data = prime_data)
+regprice1_house_time<-coeftest(regprice1_house_time, vcov. = vcovHC(regprice1_house_time, type= "HC2"))
+summary(regprice1_house_time)
+regprice1_location<-lm(ln_soldprice~offender_lived_1+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                         sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                         sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+month_1+month_2+month_3+month_4+month_5+month_6+month_7+month_8+month_9+month_10+month_11+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                year__2020+year__2021+tract__212270102+tract__212270103+tract__212270104+tract__212270105+tract__212270106+tract__212270107+tract__212270108+tract__212270109+tract__212270110+tract__212270111+tract__212270112+tract__212270113+tract__212270114+
+                
+                tract__212270115+tract__212270116+tract__212270117+tract__212270118+tract__212270119, data = prime_data)
+regprice_location<-coeftest(regprice1_location, vcov. = vcovHC(regprice1_location, type= "HC2"))
+summary(regprice4)
+library(texreg)
+#omitted age_unknown,year__2012,tract__212270101, sqft_5501 to up
+screenreg(list(regprice1,regprice1_fix_house,regprice1_house_time, regprice1_location))
+##################one third of a mile
+stargazer(regprice1,regprice1_fix_house,regprice1_house_time, regprice1_location, type = "text", na.omit())
+
+reg0.3_1<-lm(ln_soldprice~offenders_within_0.3, data = combined_data)
+
+summary(reg0.3)
+reg0.3_2<- lm(ln_soldprice~offenders_within_0.3+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                 year__2020+year__2021, data = combined_data)
+
+summary(regtenth2)
+reg0.3_3<- lm(ln_soldprice~offenders_within_0.3+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+                 age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                 sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                 sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                 year__2020+year__2021, data = combined_data)
+reg_0.3_4<-lm(ln_soldprice~offenders_within_0.3+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+                age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+lotsize_use+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                year__2020+year__2021+tract_212270102+tract_212270103+tract_212270104+tract_212270105+tract_212270106+tract_212270107+tract_212270108+
+                tract_212270109+tract_212270110+tract_212270111+tract_212270112+tract_212270113+tract_212270114+
+                tract_212270115+tract_212270116+tract_212270117+tract_212270118+tract_212270119, data = combined_data)
+summary(reg_0.3_4)
+
+regl<-lm(ln_soldprice~ln_lotsize, data = prime_data
+         )
+#omitted age_unknown,year__2012,tract__212270101, sqft_5501 to up
+library(descr)
+library(summarytools)
+install.packages("descr")
+
+data(iris)
+statd<- prime_data%>% select("beds":"hb",'lotsize_use':"offender_lived_1", -tract_)
+summary_stats <- summary(desstat)
+
+summary_stats_transposed <- t(summary_stats)
+
+# View the transposed table
+summary_stats_transposed
+
+desstat$soldyear<-final_data$year_sold
+#################Tenth
+regtenth1<-lm(ln_soldprice~offenders_lived_0.1, data = prime_data)
+
+regtenth1<-coeftest(regtenth1, vcov. = vcovHC(regtenth1, type = "HC2"))
+regtenth2<- lm(ln_soldprice~offenders_lived_0.1+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                 sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                 sqft_3751_4250+sqft_4251_5000+sqft_5001_5500, data = prime_data)
+summary(regtenth2)
+regtenth2<-coeftest(regtenth2, vcov. = vcovHC(regtenth2, type = "HC2"))
+regtenth3<- lm(ln_soldprice~offenders_lived_0.1+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                 sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                 sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+month_1+month_2+month_3+month_4+month_5+month_6+month_7+month_8+month_9+month_10+month_11+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                 year__2020+year__2021, data = prime_data)
+summary(regtenth3)
+regtenth3<-coeftest(regtenth3, vcov. = vcovHC(regtenth3, type = "HC2"))
+regtenth4<-lm(ln_soldprice~offenders_lived_0.1+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+month_1+month_2+month_3+month_4+month_5+month_6+month_7+month_8+month_9+month_10+month_11+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                year__2020+year__2021+tract__212270101+tract__212270102+tract__212270103+tract__212270104+tract__212270105+tract__212270106+tract__212270107+tract__212270108+tract__212270109+tract__212270110+tract__212270111+tract__212270112+tract__212270113+tract__212270114+
+                
+                tract__212270115+tract__212270116+tract__212270117+tract__212270118+tract__212270119, data = prime_data)
+regtenth4<-coeftest(regtenth4, vcov. = vcovHC(regtenth4, type = "HC2"))
+#omitted age_unknown,year__2012,tract__212270101, sqft_5501 to up
+summary(regtenth4)
+screenreg(list(regtenth1,regtenth2,regtenth3,regtenth4))
+
+stargazer(regtenth1,regtenth2,regtenth3, type = "text")
+
+summary(regtenth)
+
+# age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+#   age_unknown+beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+#   sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+#   sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+sqft_5501_6000+sqft_6000+ lotsize_use
+
+                  ##########DAYS########
+
+day_reg1<-lm(daysonmarket~offenders_within_1mile, data = combined_data)
+summary(day_reg1)
+
+
+
+day_reg0.1_1<-lm(daysonmarket~offenders_lived_0.1, data = prime_data)
+
+day_reg2<-lm(daysonmarket~offenders_lived_0.1+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+
+                                 beds+fb+hb+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                                 sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                                 sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+lotsize_use+AC_electric+attached_garage+units+appearance_fair+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                                 year__2020+year__2021+tract__212270102+tract__212270103+tract__212270104+tract__212270105+tract__212270106+tract__212270107+tract__212270108+tract__212270109+tract__212270110+tract__212270111+tract__212270112+tract__212270113+tract__212270114+
+               
+               tract__212270115+tract__212270116+tract__212270117+tract__212270118+tract__212270119, data = prime_data)
+summary(day_reg2)
+coeftest(day_reg2, vcov. = vcovHC(day_reg2, type = "HC2"))
+
+
+#############view
+library(texreg)
+screenreg(list(regprice1, regprice2_fix_year, regprice3_fix_house,regprice_house_y, regprice4))
+
+prime_data$sold_year<- combined_data$year_sold 
+
+
+reg_presence<-lm(ln_soldprice~offender_presence+beds+fb+hb+ lotsize_use+AC_electric+attached_garage+units+appearance_fair+age_05_or_less+age_06_10+age_11_15+age_16_20+age_21_25+age_26_30+age_31_35+age_36_40+age_41_50+age_51_60+ age_61_70+age_71_80+age_81+sqft_1001_1200+sqft_1201_1400+sqft_1401_1600+sqft_1601_1800+sqft_1801_2000+
+                  sqft_2001_2200+sqft_2201_2500+sqft_2501_2750+sqft_2751_3000+sqft_3001_3300+sqft_3301_3750+
+                  sqft_3751_4250+sqft_4251_5000+sqft_5001_5500+month_1+month_2+month_3+month_4+month_5+month_6+month_7+month_8+month_9+month_10+month_11+year__2013+year__2014+year__2015+year__2016+year__2017+year__2018+year__2019+
+                  year__2020+year__2021+tract__212270106+tract__212270107+tract__212270108+tract__212270109+tract__212270110+tract__212270111+tract__212270112+tract__212270113+tract__212270114+
+                   tract__212270115+tract__212270116+tract__212270117+tract__212270118+tract__212270119, data = prime_data)
+
+summary(reg_presence)
+
+stats<- prime_data%>%
+  select('soldprice',"offender_lived_1",'offenders_lived_0.1', "lotsize_use", "beds",'fb','hb','distance')
+statd<-statd%>%na.omit()
+stargazer(summary = prime_data_no_na_numeric, missing=TRUE,logical=TRUE
+          )
+stargazer(stats, type = "text", title="Descriptive statistics", digits=1, out="table1.txt")
+stargazer(regprice1, regprice1_fix_house, regprice1_house_time, regprice1_location, type="html", out="models.html")
+prime_data_L<-prime_data%>%
+  select('age_05_or_less':'age_81','age_unknown','appearance_fair','beds':'offender_lived_1','AC_electric':'units',"month_sold":"offender_presence")
+
+```
+
